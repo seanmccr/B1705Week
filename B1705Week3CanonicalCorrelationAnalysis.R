@@ -250,6 +250,131 @@ s1 %*% cc1$xcoef
 s2 <- diag(sqrt(diag(cov(performance))))
 s2 %*% cc1$ycoef
 
+# ----- 15. Canonical Correlation: Practical -----
 
 
+rm(list = ls())
 
+# Load necessary library
+library(MASS)  # For generating correlated data
+
+# Function to create a synthetic dataset
+create_dataset <- function(n = 100, means, Sigma) {
+  data <- MASS::mvrnorm(n = n, mu = means, Sigma = Sigma)
+  colnames(data) <- c("CalorieIntake", "ProteinContent", "VitaminLevels", "WaterIntake",
+                      "StressLevel", "MoodRating", "SleepQuality", "ConcentrationLevel")
+  return(as.data.frame(data))
+}
+
+# Define means and a covariance matrix for the variables
+# These are example values and can be adjusted
+means <- c(2000, 50, 100, 2, 5, 7, 7, 7)  # Example mean values for each variable
+Sigma <- matrix(c(
+  1, 0.5, 0, 0, 0, 0.3, 0.3, 0,
+  0.5, 1, 0, 0, 0, 0.2, 0.4, 0,
+  0, 0, 1, 0, -0.2, 0.2, 0, 0,
+  0, 0, 0, 1, -0.3, 0.1, 0.2, 0.1,
+  0, 0, -0.2, -0.3, 1, -0.4, -0.5, -0.3,
+  0.3, 0.2, 0.2, 0.1, -0.4, 1, 0.6, 0.4,
+  0.3, 0.4, 0, 0.2, -0.5, 0.6, 1, 0.5,
+  0, 0, 0, 0.1, -0.3, 0.4, 0.5, 1
+), ncol = 8)
+
+# Generate the dataset
+set.seed(123) # For reproducibility
+health_dataset <- create_dataset(n = 500, means, Sigma)
+
+# Calculate  correlation and covariance matrix
+
+cor_matrix <- cor(health_dataset) # create the correlation matrix
+cov_matrix <- cov(health_dataset) # create the covariance matrix
+
+##### 15.1. Loading the dataset and visualising correlations #####
+# Load packages
+library(ggplot2)
+library(corrplot)
+
+cor_matrix <- cor(health_dataset) # create the correlation matrix
+cov_matrix <- cov(health_dataset) # create the covariance matrix
+
+# Visualise  correlation matrix
+corrplot(cor_matrix, method = "number")
+
+
+##### 15.2. Visualisations and Examples #####
+# More visualisations of the variables. Example 1 and 2 use select variables, the correlation matrix shows all variables as a value in relation
+# Example 1
+
+# Scatterplot of Calorie Intake and Sleep Quality
+ggplot(health_dataset, aes(x = CalorieIntake, y = SleepQuality)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  labs(title = "Scatterplot of Calorie Intake and Sleep Quality",
+       x = "Intake (cals)",
+       y = "Sleep Quality (low - high)") +
+  theme_bw()
+
+## Example 2
+# Categorise Mood Rating into 'Low', 'Medium', and 'High'
+health_dataset$MoodRatingCat <- cut(health_dataset$MoodRating, 
+                                    breaks = quantile(health_dataset$MoodRating, probs = 0:3/3),
+                                    labels = c("Low", "Medium", "High"), 
+                                    include.lowest = TRUE)
+
+# Nested Scatterplot
+ggplot(health_dataset, aes(x = WaterIntake, y = ConcentrationLevel)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  facet_wrap(~ MoodRatingCat, scales = "free") +
+  labs(title = "Nested Scatterplot of Water Intake and Concentration Level by Mood Rating",
+       x = "Water Intake (l)",
+       y = "Concentration Level (low - high)",
+       caption = "Mood Categories: Low, Medium, High") +
+  theme_minimal()
+
+##### 15.3. Loading libraries and partitioning dataset into nutritional and health variables #####
+library(ggplot2)
+library(GGally)
+library(CCA)
+library(CCP)
+
+
+nutrition <- health_dataset[,1:4]
+health <- health_dataset[,5:8]
+
+matcor(health, nutrition)
+
+
+##### 15.4. Displaying canonical correlations #####
+cc1 <- cc(health, nutrition) 
+
+# display the canonical correlations
+cc1$cor
+
+##### 15.5. Printing raw canonical coefficients #####
+cc1[3:4]
+
+##### 15.6 Computing canonical loadings #####
+cc2 <- comput(health, nutrition, cc1)
+
+# display canonical loadings
+cc2[3:6]
+
+# tests of canonical dimensions
+rho <- cc1$cor
+## Define number of observations, number of variables in first set, and number of variables in the second set.
+n <- dim(nutrition)[1]
+p <- length(nutrition)
+q <- length(health)
+
+##### 15.7. Calculate p-values using the F-approximations of different test statistics:
+p.asym(rho, n, p, q, tstat = "Wilks")
+
+##### 15.8. Standardising ##### 
+# nutrition canonical coefficients diagonal matrix of nutrition sd's
+s1 <- diag(sqrt(diag(cov(nutrition))))
+s1 %*% cc1$xcoef
+
+# tandardised health canonical coefficients diagonal matrix of health sd's
+s2 <- diag(sqrt(diag(cov(health))))
+s2 %*% cc1$ycoef
